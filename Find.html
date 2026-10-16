@@ -1,0 +1,798 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Find — Search Smarter</title>
+
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #101114;
+  --panel: #191b20;
+  --line: #30343d;
+  --text: #f2f3f5;
+  --muted: #a3a8b3;
+  --accent: #8ab4ff;
+}
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.6 Arial, sans-serif;
+}
+
+header {
+  padding: 18px 6%;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.logo { font-size: 26px; font-weight: bold; }
+.logo span { color: var(--accent); }
+
+main {
+  width: min(1000px, 92%);
+  margin: 48px auto;
+  min-height: 65vh;
+}
+.hero { text-align: center; margin-bottom: 28px; }
+.hero h1 { font-size: clamp(36px, 7vw, 58px); margin: 0; line-height: 1.2; }
+.hero p, .muted { color: var(--muted); }
+
+.search {
+  display: flex;
+  gap: 10px;
+  padding: 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+input {
+  min-width: 0;
+  flex: 1;
+  padding: 13px;
+  background: transparent;
+  color: var(--text);
+  border: 0;
+  outline: 0;
+  font-size: 16px;
+}
+button {
+  cursor: pointer;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 15px;
+  color: var(--text);
+  background: #22252c;
+  font-size: 14px;
+}
+button:hover { border-color: var(--accent); }
+button.primary {
+  background: var(--accent);
+  color: #101827;
+  border: 0;
+  font-weight: bold;
+}
+button:disabled { opacity: .5; cursor: wait; }
+
+.modes, .tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 16px 0;
+}
+.active { border-color: var(--accent); color: var(--accent); }
+
+#status {
+  color: var(--muted);
+  font-size: 14px;
+  min-height: 24px;
+}
+#results { display: none; margin-top: 24px; }
+.tabs {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
+}
+.tabs button { border-radius: 20px; }
+
+.card, .message {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  padding: 17px;
+  margin: 12px 0;
+  overflow-wrap: anywhere;
+}
+.card a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: bold;
+}
+.card a:hover { text-decoration: underline; }
+.url { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+
+.image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+  margin-top: 15px;
+}
+.image-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  min-width: 0;
+}
+.image-card img {
+  width: 100%;
+  height: 175px;
+  object-fit: cover;
+  display: block;
+  background: #22252c;
+}
+.image-card .image-title {
+  padding: 10px 12px;
+  margin: 0;
+  font-size: 14px;
+}
+.image-card a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.image-card .url { padding: 0 12px 12px; }
+
+.message.user { background: #202f46; }
+.role { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+.answer p { margin: 8px 0; }
+.answer pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.answer li { margin: 5px 0; }
+
+.hide { display: none !important; }
+.error { color: #ffaaa5; }
+#chatForm { display: flex; gap: 8px; margin-top: 14px; }
+#chatInput {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+}
+.empty {
+  padding: 25px 10px;
+  text-align: center;
+  color: var(--muted);
+}
+footer {
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 30px;
+}
+
+@media(max-width: 520px) {
+  main { margin: 30px auto; }
+  .search { gap: 3px; }
+  button { padding: 9px 11px; }
+  .image-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .image-card img { height: 130px; }
+  header { padding: 15px 4%; }
+}
+</style>
+</head>
+
+<body>
+<header>
+  <div class="logo">Find<span>.</span></div>
+  <div class="muted">Search smarter</div>
+</header>
+
+<main>
+  <section class="hero">
+    <h1>Find what matters.</h1>
+    <p>Search the web. Discover images. Explore news. Ask AI.</p>
+  </section>
+
+  <form class="search" id="searchForm">
+    <input id="query" placeholder="Search anything..." autocomplete="off" required>
+    <button class="primary" id="searchBtn" type="submit">Search</button>
+  </form>
+
+  <div class="modes">
+    <button class="active" data-mode="web" type="button">Web Search</button>
+    <button data-mode="ai" type="button">AI Chat</button>
+    <button data-mode="research" type="button">Research Mode</button>
+  </div>
+
+  <div id="status">Connecting to Find server...</div>
+
+  <section id="results">
+    <div class="tabs">
+      <button class="active" data-tab="web" type="button">All</button>
+      <button data-tab="images" type="button">Images</button>
+      <button data-tab="news" type="button">News</button>
+      <button data-tab="videos" type="button">Videos</button>
+      <button data-tab="ai" type="button">AI Answer</button>
+      <button data-tab="research" type="button">Research</button>
+    </div>
+
+    <div id="webPanel"></div>
+    <div id="imagesPanel" class="hide"></div>
+    <div id="newsPanel" class="hide"></div>
+    <div id="videosPanel" class="hide"></div>
+
+    <div id="aiPanel" class="hide">
+      <div id="chat"></div>
+      <form id="chatForm">
+        <input id="chatInput" placeholder="Ask a follow-up..." autocomplete="off">
+        <button class="primary" id="sendBtn" type="submit">Send</button>
+      </form>
+    </div>
+
+    <div id="researchPanel" class="hide"></div>
+  </section>
+</main>
+
+<footer>Find · Personal search prototype</footer>
+
+<script>
+"use strict";
+
+const $ = selector => document.querySelector(selector);
+const $$ = selector => [...document.querySelectorAll(selector)];
+
+let currentQuery = "";
+let currentMode = "web";
+let currentTab = "web";
+let chatHistory = [];
+let busy = false;
+
+function status(message, error = false) {
+  $("#status").textContent = message;
+  $("#status").classList.toggle("error", error);
+}
+
+function escapeHTML(value) {
+  return String(value ?? "").replace(/[&<>"']/g, c => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  }[c]));
+}
+
+function safeURL(value) {
+  const url = String(value || "");
+  return /^https?:\/\//i.test(url) ? url : "";
+}
+
+function markdown(text) {
+  return escapeHTML(text)
+    .replace(/```([\s\S]*?)```/g, "<pre><code>$1</code></pre>")
+    .replace(/^### (.+)$/gm, "<h3>$1</h3>")
+    .replace(/^## (.+)$/gm, "<h2>$1</h2>")
+    .replace(/^# (.+)$/gm, "<h1>$1</h1>")
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.+?)\*/g, "<em>$1</em>")
+    .replace(/`(.+?)`/g, "<code>$1</code>")
+    .replace(/^\s*[-*] (.+)$/gm, "• $1")
+    .split(/\n{2,}/)
+    .map(p => "<p>" + p.replace(/\n/g, "<br>") + "</p>")
+    .join("");
+}
+
+async function api(url, payload) {
+  let response;
+
+  try {
+    response = await fetch(
+      url,
+      payload === undefined
+        ? {}
+        : {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          }
+    );
+  } catch {
+    throw new Error(
+      "Cannot connect to server. Open http://localhost:3000 and keep server.py running."
+    );
+  }
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok || data.ok === false) {
+    throw new Error(data.error || "Request failed (" + response.status + ").");
+  }
+
+  return data;
+}
+
+function getResults(data) {
+  if (Array.isArray(data)) return data;
+
+  const possibleLists = [
+    data.results,
+    data.items,
+    data.images,
+    data.news,
+    data.videos,
+    data.data
+  ];
+
+  for (const list of possibleLists) {
+    if (Array.isArray(list)) return list;
+  }
+
+  return [];
+}
+
+function prepare(name) {
+  $("#results").style.display = "block";
+  panel(name);
+  $("#results").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function panel(name) {
+  currentTab = name;
+
+  const panels = {
+    web: "#webPanel",
+    images: "#imagesPanel",
+    news: "#newsPanel",
+    videos: "#videosPanel",
+    ai: "#aiPanel",
+    research: "#researchPanel"
+  };
+
+  Object.entries(panels).forEach(([key, selector]) => {
+    $(selector).classList.toggle("hide", key !== name);
+  });
+
+  $$(".tabs button").forEach(button => {
+    button.classList.toggle("active", button.dataset.tab === name);
+  });
+}
+
+function addMessage(role, text, loading = false) {
+  const el = document.createElement("div");
+  el.className = "message " + role;
+
+  const label = document.createElement("div");
+  label.className = "role";
+  label.textContent = role === "user" ? "You" : "Find AI";
+
+  const body = document.createElement("div");
+  body.className = "answer";
+  body.innerHTML = loading ? "Thinking..." : markdown(text);
+
+  el.append(label, body);
+  $("#chat").appendChild(el);
+
+  return el;
+}
+
+function resultCard(item, label = "Search result") {
+  const url = safeURL(item.url || item.link || item.page_url);
+  const title = item.title || item.name || label;
+  const snippet = item.snippet || item.description || item.summary || "";
+
+  return `
+    <article class="card">
+      ${
+        url
+          ? `<a href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer">${escapeHTML(title)}</a>
+             <div class="url">${escapeHTML(url)}</div>`
+          : `<strong>${escapeHTML(title)}</strong>`
+      }
+      <p>${escapeHTML(snippet)}</p>
+    </article>
+  `;
+}
+
+async function runSearch(query) {
+  query = query.trim();
+  if (!query || busy) return;
+
+  currentQuery = query;
+  currentMode = "web";
+  prepare("web");
+  $("#webPanel").innerHTML = '<p class="empty">Searching the web...</p>';
+
+  busy = true;
+  status("Searching the web...");
+
+  try {
+    const data = await api("/api/search?q=" + encodeURIComponent(query));
+    const items = getResults(data);
+
+    $("#webPanel").innerHTML = items.length
+      ? items.map(item => resultCard(item)).join("")
+      : '<p class="empty">No results found. Try another search.</p>';
+
+    status("Web search complete · " + items.length + " results");
+  } catch (error) {
+    $("#webPanel").innerHTML =
+      '<div class="card error">' + escapeHTML(error.message) + "</div>";
+    status(error.message, true);
+  } finally {
+    busy = false;
+  }
+}
+
+async function runCategory(query, kind, force = false) {
+  query = query.trim();
+  if (!query || busy) return;
+
+  const target = $("#" + kind + "Panel");
+
+  if (!force && target.dataset.query === query && target.children.length) {
+    prepare(kind);
+    return;
+  }
+
+  currentQuery = query;
+  currentMode = "web";
+  prepare(kind);
+
+  target.dataset.query = query;
+  target.innerHTML =
+    '<p class="empty">Loading ' + escapeHTML(kind) + '...</p>';
+
+  busy = true;
+  status("Searching " + kind + "...");
+
+  try {
+    const data = await api(
+      "/api/" + kind + "?q=" + encodeURIComponent(query)
+    );
+    const items = getResults(data);
+
+    if (!items.length) {
+      target.innerHTML =
+        '<p class="empty">No results found. Try another search.</p>';
+    } else if (kind === "images") {
+      target.innerHTML =
+        '<div class="image-grid">' +
+        items.map(item => {
+          const image = safeURL(
+            item.image ||
+            item.image_url ||
+            item.thumbnail ||
+            item.thumbnail_url ||
+            item.src ||
+            item.url
+          );
+
+          const link = safeURL(
+            item.page_url ||
+            item.source_url ||
+            item.link ||
+            item.url ||
+            image
+          );
+
+          const title = item.title || item.alt || "Search image";
+
+          return `
+            <article class="image-card">
+              ${
+                image
+                  ? `<a href="${escapeHTML(link || image)}" target="_blank" rel="noopener noreferrer">
+                       <img src="${escapeHTML(image)}"
+                            alt="${escapeHTML(title)}"
+                            loading="lazy"
+                            onerror="this.style.display='none'">
+                     </a>`
+                  : '<div class="empty">Preview unavailable</div>'
+              }
+              <p class="image-title">
+                ${
+                  link || image
+                    ? `<a href="${escapeHTML(link || image)}" target="_blank" rel="noopener noreferrer">${escapeHTML(title)}</a>`
+                    : escapeHTML(title)
+                }
+              </p>
+            </article>
+          `;
+        }).join("") +
+        "</div>";
+    } else {
+      target.innerHTML = items.map(item => {
+        const url = safeURL(item.url || item.link || item.page_url);
+        const title = item.title || item.name || "Search result";
+        const description =
+          item.snippet || item.description || item.summary || "";
+        const thumbnail = safeURL(
+          item.thumbnail || item.thumbnail_url || item.image || item.image_url
+        );
+
+        return `
+          <article class="card">
+            ${
+              thumbnail && kind === "videos"
+                ? `<a href="${escapeHTML(url || "#")}" target="_blank" rel="noopener noreferrer">
+                     <img src="${escapeHTML(thumbnail)}" alt=""
+                          loading="lazy"
+                          style="width:100%;max-width:360px;max-height:205px;object-fit:cover;border-radius:9px"
+                          onerror="this.style.display='none'">
+                   </a>`
+                : ""
+            }
+            ${
+              url
+                ? `<a href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer">${escapeHTML(title)}</a>
+                   <div class="url">${escapeHTML(url)}</div>`
+                : `<strong>${escapeHTML(title)}</strong>`
+            }
+            <p>${escapeHTML(description)}</p>
+          </article>
+        `;
+      }).join("");
+    }
+
+    status(
+      kind.charAt(0).toUpperCase() + kind.slice(1) +
+      " search complete · " + items.length + " results"
+    );
+  } catch (error) {
+    target.innerHTML =
+      '<div class="card error">' + escapeHTML(error.message) + "</div>";
+    status(error.message, true);
+  } finally {
+    busy = false;
+  }
+}
+
+async function runAIResearch(query) {
+  query = query.trim();
+  if (!query || busy) return;
+
+  currentQuery = query;
+  currentMode = "ai";
+  prepare("ai");
+  $("#chat").innerHTML = "";
+  chatHistory = [];
+
+  addMessage("user", query);
+  const loading = addMessage("assistant", "", true);
+
+  busy = true;
+  status("Find AI is thinking...");
+
+  try {
+    const data = await api("/api/ask", {
+      message: query,
+      history: []
+    });
+
+    const answer =
+      data.answer || data.response || data.message || "No answer returned.";
+
+    loading.querySelector(".answer").innerHTML = markdown(answer);
+
+    chatHistory = [
+      { role: "user", content: query },
+      { role: "assistant", content: answer }
+    ];
+
+    status("AI Chat · Ready for follow-up");
+  } catch (error) {
+    loading.querySelector(".answer").textContent = error.message;
+    status(error.message, true);
+  } finally {
+    busy = false;
+  }
+}
+
+async function askChat(query) {
+  query = query.trim();
+  if (!query || busy) return;
+
+  $("#chatInput").value = "";
+  addMessage("user", query);
+  const loading = addMessage("assistant", "", true);
+
+  busy = true;
+  status("Find AI is thinking...");
+
+  try {
+    const data = await api("/api/ask", {
+      message: query,
+      history: chatHistory
+    });
+
+    const answer =
+      data.answer || data.response || data.message || "No answer returned.";
+
+    loading.querySelector(".answer").innerHTML = markdown(answer);
+
+    chatHistory.push(
+      { role: "user", content: query },
+      { role: "assistant", content: answer }
+    );
+    chatHistory = chatHistory.slice(-20);
+
+    status("AI Chat · Ready");
+  } catch (error) {
+    loading.querySelector(".answer").textContent = error.message;
+    status(error.message, true);
+  } finally {
+    busy = false;
+  }
+}
+
+async function runResearch(query) {
+  query = query.trim();
+  if (!query || busy) return;
+
+  currentQuery = query;
+  currentMode = "research";
+  prepare("research");
+
+  $("#researchPanel").innerHTML =
+    '<p class="empty">Researching with web sources...</p>';
+
+  busy = true;
+  status("Research Mode is searching the web...");
+
+  try {
+    const data = await api("/api/research", { query: query });
+    const answer = data.answer || data.response || "No research answer returned.";
+    const sources = Array.isArray(data.sources) ? data.sources : getResults(data);
+
+    const sourceHTML = sources.map((item, index) => {
+      const url = safeURL(item.url || item.link);
+      const title = item.title || ("Source " + (index + 1));
+
+      return `
+        <article class="card">
+          ${
+            url
+              ? `<a href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer">${escapeHTML(title)}</a>`
+              : `<strong>${escapeHTML(title)}</strong>`
+          }
+          <p>${escapeHTML(item.snippet || item.description || "")}</p>
+        </article>
+      `;
+    }).join("");
+
+    $("#researchPanel").innerHTML =
+      '<article class="card"><h2>Research Summary</h2><div class="answer">' +
+      markdown(answer) +
+      '</div></article><h3>Sources</h3>' +
+      (sourceHTML || '<p class="empty">No sources returned.</p>');
+
+    status("Research complete · " + sources.length + " sources");
+  } catch (error) {
+    $("#researchPanel").innerHTML =
+      '<div class="card error">' + escapeHTML(error.message) + "</div>";
+    status(error.message, true);
+  } finally {
+    busy = false;
+  }
+}
+
+$("#searchForm").addEventListener("submit", event => {
+  event.preventDefault();
+
+  const query = $("#query").value.trim();
+  if (!query) return;
+
+  currentQuery = query;
+
+  if (currentMode === "ai") {
+    runAIResearch(query);
+  } else if (currentMode === "research") {
+    runResearch(query);
+  } else {
+    runSearch(query);
+  }
+});
+
+$$(".modes button").forEach(button => {
+  button.addEventListener("click", () => {
+    currentMode = button.dataset.mode;
+
+    $$(".modes button").forEach(item => {
+      item.classList.toggle("active", item === button);
+    });
+
+    const query = $("#query").value.trim() || currentQuery;
+
+    if (!query) {
+      status(
+        currentMode === "ai"
+          ? "Enter a question to chat with AI."
+          : currentMode === "research"
+          ? "Enter a topic to research."
+          : "Enter a search query."
+      );
+      $("#query").focus();
+      return;
+    }
+
+    if (currentMode === "ai") runAIResearch(query);
+    else if (currentMode === "research") runResearch(query);
+    else runSearch(query);
+  });
+});
+
+$$(".tabs button").forEach(button => {
+  button.addEventListener("click", () => {
+    const tab = button.dataset.tab;
+
+    if (!currentQuery && !$("#query").value.trim()) {
+      panel(tab);
+      status("Enter a search query first.");
+      $("#query").focus();
+      return;
+    }
+
+    const query = $("#query").value.trim() || currentQuery;
+    currentQuery = query;
+
+    if (tab === "images" || tab === "news" || tab === "videos") {
+      runCategory(query, tab);
+    } else if (tab === "web") {
+      if (currentTab === "web" && $("#webPanel").children.length) {
+        panel("web");
+      } else {
+        runSearch(query);
+      }
+    } else if (tab === "ai") {
+      if ($("#chat").children.length) {
+        prepare("ai");
+      } else {
+        runAIResearch(query);
+      }
+    } else if (tab === "research") {
+      if ($("#researchPanel").children.length) {
+        prepare("research");
+      } else {
+        runResearch(query);
+      }
+    }
+  });
+});
+
+$("#chatForm").addEventListener("submit", event => {
+  event.preventDefault();
+  askChat($("#chatInput").value);
+});
+
+(async () => {
+  try {
+    const data = await api("/api/health");
+
+    status(
+      data.ai_configured
+        ? "Server connected · AI configured"
+        : "Server connected · Check your Groq API key in .env"
+    );
+  } catch (error) {
+    status(error.message, true);
+  }
+})();
+</script>
+
+<footer style="
+    text-align: center;
+    padding: 18px 10px;
+    color: #999;
+    font-size: 13px;
+    border-top: 1px solid #292929;
+    margin-top: 35px;
+">
+    Find is made by <strong style="color: #ffffff;">Samyak Jain</strong>
+</footer>
+
+</body>
+</html>
+s
